@@ -1,0 +1,331 @@
+﻿@page "/"
+
+@using Microsoft.AspNetCore.Components
+@using System.Net.Http
+@using System.Net.Http.Json
+@using System.Text.Json
+@using SilhouetteCore.Cloud
+@using SilhouetteCore.Common
+
+@inject HttpClient http
+
+<PageTitle>Home</PageTitle>
+
+<style>
+    .home {
+        height: 100vh;
+        width: 100%;
+        display: grid;
+        background: lightblue;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .container {
+        height: fit-content;
+        width: 100%;
+        display: grid;
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+    }
+
+    .buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2rem;
+        gap: 1rem;
+    }
+
+    .btn {
+        width: 300px;
+        padding: 1rem;
+        background: lightgrey;
+    }
+
+    .message_container {
+        display: grid;
+        gap: 0.5rem;
+        margin-top: 2rem;
+        text-align: center;
+    }
+
+    .message {
+        color: black;
+    }
+
+    .error_message {
+        color: red;
+        font-weight: bold;
+    }
+
+    .success_message {
+        color: green;
+        font-weight: bold;
+    }    
+    
+    .failed_message {
+        color: red;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .refresh_btn {
+        width: fit;
+        padding: 0.5rem;
+        background: lightgrey;
+    }
+
+    .refresh_container {
+        display: grid;
+        justify-content: center;
+        margin-top: 1.5rem;
+    }
+
+    .header {
+        text-align: center
+    }
+
+    .code_container {
+        background: #00000090;
+        text-align: left;
+        color: white;
+    }
+
+    span {
+        color: blue
+    }
+
+    .green_span {
+        color: darkgreen;
+        font-weight: 800;
+    }
+
+    .btn_links {
+        display: grid;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .server_message {
+        text-align: left;
+    }
+
+</style>
+
+<div class="home">
+    <section class="container">
+        <article>
+            <div class="header">
+                <h1>CROSS ORIGIN RESOURCE SHARING</h1>
+                <p></p>
+            </div>
+            <div class="buttons">
+                <div class="btn_links">
+                    <button class="btn" @onclick="SendPostRequestWorking">Working CORS</button>
+                    <a href="https://github.com/tomsilhouette/web-server-cors" target="_blank">View Source Code</a>
+                </div>
+                <div class="btn_links">
+                    <button class="btn" @onclick="SendPostRequestBroken">Not Working CORS</button>
+                    <a href="https://github.com/tomsilhouette/web-server-broken-cors" target="_blank">View Source Code</a>
+                </div>
+                <div class="btn_links">
+                    <button class="btn" @onclick="SendPostSilhouetteLogin">Silhouette Login</button>
+                    <span>Magneto Code (N/A)</span>
+                </div>
+            </div>
+                    @if (loginFailed)
+                    {
+                        <div class="failed_message">LOGIN FAILED</div>
+                    }
+            @if (!string.IsNullOrEmpty(responseMessageStatus) || !string.IsNullOrEmpty(responseMessageData) || !string.IsNullOrEmpty(errorResponse) || loginSuccess)
+            {
+                <section class="message_container">
+
+                    @if (loginSuccess)
+                    {
+                        <div class="success_message">LOGIN SUCCESS</div>
+                    }
+
+                    <div class="message">@responseMessageStatus</div>
+                    <div class="message">Server URL: @sendToUrl</div>
+                    <div class="message">Message: @responseMessageData</div>
+                    <div class="error_message">@errorResponse</div>
+
+                    @if (isWorkingCors == 1 || isWorkingCors == 2)
+                    {
+                        <div class="server_message">Server CORS Policy</div>
+                    }
+                    <section class="code_container">
+                        @if (isWorkingCors == 1)
+                        {
+                            <pre><code>
+                            <span>app</span>.use(
+                            <span>cors</span>({
+                            <span>origin</span>: 'https://ambitious-ocean-09f9fbd03-preview.westeurope.5.azurestaticapps.net',
+                            <span>methods</span>: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+                            <span>allowedHeaders</span>: 'Content-Type, Authorization',
+                            <span>optionsSuccessStatus</span>: <span class="green_span">200</span>, // Some legacy browsers (IE11, various SmartTVs) choke on 204
+                                                                                        })
+                                                                                        );
+                                                                                            </code></pre>
+                        }
+                        else if (isWorkingCors == 2)
+                        {
+                            <pre><code>
+                            <span>app</span>.use(
+                            <span>cors</span>({
+                            <span>origin</span>: 'https://ambitious-ocean-09f9fbd03-preview.westeurope.5.azurestaticapps.net',
+                            <span>methods</span>: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+                            <span>allowedHeaders</span>: 'Content-Type, Authorization',
+                                                                                        })
+                                                                                        );
+                                                                                            </code></pre>
+                        }
+                    </section>
+
+                </section>
+            }
+            <section class="message_container">
+                <div class="message">Please open the browser's Developer Tools and then the 'Network' tab to find data on this test post.</div>
+                <div class="message">Press F12 or right click and open 'Inspect'</div>
+                <div class="message">Test the 'Login' button. Then open a security free version of chrome by (on windows)</div>
+                <div class="message">Open 'Run' and enter 'chrome.exe --user-data-dir="C://Chrome dev session" --disable-web-security' </div>
+                <div class="message">Run the login function again and it will work security/cors free </div>
+            </section>
+        </article>
+
+        <div class="refresh_container">
+            <button class="refresh_btn" @onclick="RefreshPage">Refresh Page</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    public string workingUrl = "https://web-server-cors.vercel.app/test-post-working";
+    public string brokenUrl = "https://web-server-broken-cors.vercel.app/test-post-broken";
+    public string silhouetteUrl = "https://api.silhouettedesignstore.com";
+
+    public string? responseMessageStatus;
+    public string? sendToUrl;
+    public string? responseMessageData;
+    public string? errorResponse;
+
+    public int isWorkingCors { get; set; } = 0;
+
+    private bool loginSuccess = false;
+    private bool loginFailed = false;
+
+    private string? email;
+    private string? password;
+    private int? userId;
+    private string? token;
+
+    private async Task SendPostRequestWorking()
+    {
+        isWorkingCors = 1;
+        RefreshPage();
+        await SendPostRequest(workingUrl);
+    }
+
+    private async Task SendPostRequestBroken()
+    {
+        isWorkingCors = 2;
+        RefreshPage();
+        await SendPostRequest(brokenUrl);
+    }
+
+    private async Task SendPostSilhouetteLogin()
+    {
+        isWorkingCors = 0;
+        RefreshPage();
+
+        await LoginAsync("tbrockington@silhouettesoftware.com", "Qq!1111111");
+    }
+
+    public async Task LoginAsync(string email, string password, CancellationToken token = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(email, nameof(email));
+        ArgumentException.ThrowIfNullOrEmpty(password, nameof(password));
+
+        var auth = await CloudOperations.RequestAuthenticateAsync(SCHttpManager.Default, email, password, token);
+
+        this.email = email;
+        this.password = password;
+        this.token = auth.Token;
+        userId = auth.UserId;
+
+        if (userId != -1)
+        {
+            loginSuccess = true; // Set the success flag to true
+        } 
+        else if (userId == -1)
+        {
+            loginFailed = true;
+        }
+
+        // Ensure the component is re-rendered
+        StateHasChanged();
+    }
+
+    private async Task SendPostRequest(string url)
+    {
+        HttpRequestMessage request = new()
+        {
+                Method = HttpMethod.Post,
+                RequestUri = new Uri(url),
+                Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json")
+        };
+
+        try
+        {
+            HttpResponseMessage response = await http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var responseObject = JsonSerializer.Deserialize<ResponseObject>(jsonResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                responseMessageStatus = responseObject?.Status;
+                responseMessageData = responseObject?.Data;
+                sendToUrl = url;
+                errorResponse = null;
+            }
+            else
+            {
+                responseMessageStatus = "Request Failed";
+                responseMessageData = null;
+                errorResponse = $"Error: {response.StatusCode}, Could not connect to the server";
+                sendToUrl = url;
+            }
+        }
+        catch (Exception ex)
+        {
+            responseMessageStatus = "Request Failed";
+            responseMessageData = null;
+            errorResponse = $"Exception: {ex.Message}";
+            sendToUrl = url;
+        }
+
+        // Ensure the component is re-rendered
+        StateHasChanged();
+    }
+
+    private void RefreshPage()
+    {
+        responseMessageStatus = null;
+        sendToUrl = null;
+        responseMessageData = null;
+        errorResponse = null;
+        loginSuccess = false; // Reset the success flag
+        loginFailed = false;
+
+        // Ensure the component is re-rendered
+        StateHasChanged();
+    }
+
+    public class ResponseObject
+    {
+        public string Status { get; set; }
+        public string Data { get; set; }
+    }
+}
